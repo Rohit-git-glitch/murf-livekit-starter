@@ -8,55 +8,24 @@ from livekit.agents import (
     AgentSession,
     JobContext,
     JobProcess,
+    UserInputTranscribedEvent,
     cli,
-    inference,
-    tokenize,
     room_io,
+    tokenize,
 )
-from livekit.plugins import murf, silero, google, deepgram, noise_cancellation
+from livekit.plugins import deepgram, google, murf, noise_cancellation, silero
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
+
+from prompt import SYSTEM_PROMPT
 
 logger = logging.getLogger("agent")
 
 load_dotenv(".env.local")
 
-# Change this prompt to change what your voice agent does.
-# See README.md for example prompts (customer support, language tutor, receptionist).
-SYSTEM_PROMPT = """You are Aarogya AI, a compassionate, reliable, and concise voice-first health assistant built for India.
-
-Your primary capabilities:
-1. Conduct initial symptom triage with simple follow-up questions.
-2. Provide general health care guidance, home remedies, and preventive measures.
-3. Suggest appropriate medical specialists based on symptoms (e.g., General Physician, Dermatologist, Cardiologist).
-4. Direct users to nearby health centers or emergency services when needed.
-
-Voice Persona and Tone:
-- Professional, reassuring, and calm.
-- Speak in simple, easily understandable English (or Hindi/Marathi if the user speaks in those languages).
-- Keep responses short (1-3 sentences) because you are speaking over a live voice stream. Avoid long lists.
-- Disclaimer: Always remind users that you are an AI assistant and not a substitute for a certified medical professional in critical situations."""
-
 
 class Assistant(Agent):
     def __init__(self) -> None:
         super().__init__(instructions=SYSTEM_PROMPT)
-
-    # To add tools, use the @function_tool decorator.
-    # Here's an example that adds a simple weather tool.
-    # You also have to add `from livekit.agents import function_tool, RunContext` to the top of this file
-    # @function_tool
-    # async def lookup_weather(self, context: RunContext, location: str):
-    #     """Use this tool to look up current weather information in the given location.
-    #
-    #     If the location is not supported by the weather service, the tool will indicate this. You must tell the user the location's weather is unavailable.
-    #
-    #     Args:
-    #         location: The location to look up weather information for (e.g. city name)
-    #     """
-    #
-    #     logger.info(f"Looking up weather for {location}")
-    #
-    #     return "sunny with a temperature of 70 degrees."
 
 
 server = AgentServer()
@@ -81,21 +50,20 @@ async def my_agent(ctx: JobContext):
     session = AgentSession(
         # Speech-to-text (STT) is your agent's ears, turning the user's speech into text that the LLM can understand
         # See all available models at https://docs.livekit.io/agents/models/stt/
-        stt=deepgram.STT(model="nova-3"),
+        stt=deepgram.STT(model="nova-3", language="multi"),
         # A Large Language Model (LLM) is your agent's brain, processing user input and generating a response
         # See all available models at https://docs.livekit.io/agents/models/llm/
         llm=google.LLM(
-                model="gemini-3.5-flash-lite",
-            ),
+            model="gemini-3.5-flash-lite",
+        ),
         # Text-to-speech (TTS) is your agent's voice, turning the LLM's text into speech that the user can hear
         # See all available models as well as voice selections at https://docs.livekit.io/agents/models/tts/
         tts=murf.TTS(
-                voice="Anisha", 
-                locale="en-IN",
-                style="Conversation",
-                tokenizer=tokenize.basic.SentenceTokenizer(min_sentence_len=2),
-                text_pacing=True
-            ),
+            voice="hi-IN-anisha",
+            style="Conversation",
+            tokenizer=tokenize.basic.SentenceTokenizer(min_sentence_len=2),
+            text_pacing=True,
+        ),
         # VAD and turn detection are used to determine when the user is speaking and when the agent should respond
         # See more at https://docs.livekit.io/agents/build/turns
         turn_detection=MultilingualModel(),
@@ -105,23 +73,73 @@ async def my_agent(ctx: JobContext):
         preemptive_generation=True,
     )
 
-    # To use a realtime model instead of a voice pipeline, use the following session setup instead.
-    # (Note: This is for the OpenAI Realtime API. For other providers, see https://docs.livekit.io/agents/models/realtime/))
-    # 1. Install livekit-agents[openai]
-    # 2. Set OPENAI_API_KEY in .env.local
-    # 3. Add `from livekit.plugins import openai` to the top of this file
-    # 4. Use the following session setup instead of the version above
-    # session = AgentSession(
-    #     llm=openai.realtime.RealtimeModel(voice="marin")
-    # )
+    @session.on("user_input_transcribed")
+    def on_user_input_transcribed(ev: UserInputTranscribedEvent):
+        transcript = ev.transcript.strip().lower()
 
-    # # Add a virtual avatar to the session, if desired
-    # # For other providers, see https://docs.livekit.io/agents/models/avatar/
-    # avatar = hedra.AvatarSession(
-    #   avatar_id="...",  # See https://docs.livekit.io/agents/models/avatar/plugins/hedra
-    # )
-    # # Start the avatar and wait for it to join
-    # await avatar.start(session, room=ctx.room)
+        if not transcript:
+            return
+
+        # Detect native Hindi (Devanagari)
+        has_devanagari = any(0x0900 <= ord(c) <= 0x097F for c in transcript)
+
+        words = set(transcript.split())
+
+        hindi_keywords = {
+            "kya", "hai", "haan", "mera", "meri", "mujhe",
+            "hum", "aap", "tum", "ka", "ki", "ke",
+            "mein", "main", "se", "aur", "par",
+            "kyun", "kab", "kaise", "acha", "theek",
+            "dhanyavaad", "shukriya"
+        }
+
+        marathi_keywords = {
+            "namaskar", "majha", "majhi", "mala",
+            "tumhi", "kay", "kasa", "kashi",
+            "kuthe", "aahe", "ahe", "barobar",
+            "krupaya"
+        }
+
+        health_keywords = {
+            "fever", "cold", "cough", "headache",
+            "pain", "stomach", "vomiting",
+            "medicine", "doctor", "hospital",
+            "blood", "pressure", "bp",
+            "sugar", "diabetes", "heart",
+            "chest", "breathing", "infection",
+            "covid", "allergy", "stress",
+            "anxiety", "depression"
+        }
+
+        hindi_health_keywords = {
+            "bukhar", "khansi", "sardi",
+            "dard", "sar", "pet",
+            "dawai", "aspatal",
+            "saans", "chakkar",
+            "ulti", "kamjori",
+            "tabiyat"
+        }
+
+        english_words = bool(words & health_keywords)
+        hindi_words = bool(words & hindi_keywords)
+
+        if has_devanagari:
+            language = "Hindi"
+        elif bool(words & marathi_keywords):
+            language = "Marathi"
+        elif english_words and hindi_words:
+            language = "Hinglish"
+        elif hindi_words:
+            language = "Hindi"
+        else:
+            language = "English"
+
+        logger.info(f"Detected Language: {language}")
+
+        if english_words or bool(words & hindi_health_keywords):
+            logger.info("Healthcare query detected.")
+        else:
+            logger.info("General conversation detected.")
 
     # Start the session, which initializes the voice pipeline and warms up the models
     await session.start(
