@@ -32,6 +32,8 @@ server = AgentServer()
 
 
 def prewarm(proc: JobProcess):
+    # Load the VAD once per worker.  This is required to detect the end of a
+    # user's turn and start the LLM/TTS response.
     proc.userdata["vad"] = silero.VAD.load()
 
 
@@ -64,12 +66,11 @@ async def my_agent(ctx: JobContext):
             tokenizer=tokenize.basic.SentenceTokenizer(min_sentence_len=2),
             text_pacing=True,
         ),
-        # VAD and turn detection are used to determine when the user is speaking and when the agent should respond
-        # See more at https://docs.livekit.io/agents/build/turns
+        # VAD and turn detection determine when the user is done speaking.
+        # Disabling both prevents voice replies from being generated.
         turn_detection=MultilingualModel(),
         vad=ctx.proc.userdata["vad"],
-        # allow the LLM to generate a response while waiting for the end of turn
-        # See more at https://docs.livekit.io/agents/build/audio/#preemptive-generation
+        # Begin generating promptly once the end of a turn is detected.
         preemptive_generation=True,
     )
 
