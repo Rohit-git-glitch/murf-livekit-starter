@@ -46,7 +46,9 @@ export async function POST(req: Request) {
       
     // Generate participant token
     const participantName = 'user';
-    const participantIdentity = `voice_assistant_user_${Math.floor(Math.random() * 10_000)}`;
+    const existingCallerId = req.cookies.get('anisha_caller_id')?.value;
+    const callerId = existingCallerId ?? crypto.randomUUID();
+    const participantIdentity = `voice_assistant_user_${callerId}`;
     const roomName = `voice_assistant_room_${Math.floor(Math.random() * 10_000)}`;
 
     const participantToken = await createParticipantToken(
@@ -65,7 +67,17 @@ export async function POST(req: Request) {
     const headers = new Headers({
       'Cache-Control': 'no-store',
     });
-    return NextResponse.json(data, { headers });
+    const response = NextResponse.json(data, { headers });
+    if (!existingCallerId) {
+      response.cookies.set('anisha_caller_id', callerId, {
+        httpOnly: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 60 * 60 * 24 * 365,
+        path: '/',
+      });
+    }
+    return response;
   } catch (error) {
     if (error instanceof Error) {
       console.error(error);

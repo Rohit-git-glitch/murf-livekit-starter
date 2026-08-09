@@ -1,4 +1,8 @@
+import json
 import logging
+import os
+import sqlite3
+from pathlib import Path
 
 from dotenv import load_dotenv
 from livekit import rtc
@@ -10,22 +14,106 @@ from livekit.agents import (
     JobProcess,
     UserInputTranscribedEvent,
     cli,
+    function_tool,
     room_io,
     tokenize,
 )
 from livekit.plugins import deepgram, google, murf, noise_cancellation, silero
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
+from caller_memory import CallerMemoryStore
 from prompt import SYSTEM_PROMPT
 
 logger = logging.getLogger("agent")
 
 load_dotenv(".env.local")
 
+DEFAULT_MEMORY_DB = Path(__file__).resolve().parent.parent / "data" / "callers.sqlite3"
+memory_store = CallerMemoryStore(os.getenv("CALLER_MEMORY_DB", DEFAULT_MEMORY_DB))
+
 
 class Assistant(Agent):
-    def __init__(self) -> None:
-        super().__init__(instructions=SYSTEM_PROMPT)
+    def __init__(
+        self,
+        caller_user_id: str | None = None,
+        initial_caller_memory: dict | None = None,
+    ) -> None:
+        self.caller_user_id = caller_user_id
+        caller_context = (
+            f"\nThe current caller's user_id is `{caller_user_id}`."
+            if caller_user_id
+            else "\nNo stable caller user_id is available for this session."
+        )
+        returning_caller_context = ""
+        if initial_caller_memory:
+            memory_json = json.dumps(initial_caller_memory, ensure_ascii=False)
+            returning_caller_context = (
+                "\nA verified startup lookup found this returning caller record: "
+                f"{memory_json}\nOn your first reply, welcome them back naturally by "
+                "name if it is present. Use these facts only when relevant and do not "
+                "claim anything beyond this record."
+            )
+        super().__init__(
+            instructions=SYSTEM_PROMPT + caller_context + returning_caller_context
+        )
+
+    @function_tool
+    async def lookup_caller(self, user_id: str) -> dict:
+        """Look up the current caller's consented structured memory by user ID."""
+        if not self._is_current_caller(user_id):
+            return {"status": "not_found"}
+        try:
+            record = memory_store.lookup(user_id)
+        except sqlite3.Error:
+            logger.exception("Caller memory lookup failed")
+            return {"status": "unavailable"}
+        return (
+            {"status": "found", "caller": record} if record else {"status": "not_found"}
+        )
+
+    @function_tool
+    async def save_caller_memory(
+        self,
+        user_id: str,
+        consent_given: bool,
+        name: str | None = None,
+        language_preference: str | None = None,
+        age_band: str | None = None,
+        ongoing_conditions: str | None = None,
+        last_triage_outcome: str | None = None,
+    ) -> dict:
+        """Save only consented, structured Health Access memory for the current caller."""
+        if not consent_given:
+            return {"status": "not_saved", "reason": "explicit_consent_required"}
+        if not self._is_current_caller(user_id):
+            return {"status": "not_saved", "reason": "invalid_caller"}
+        try:
+            caller = memory_store.save(
+                user_id=user_id,
+                name=name,
+                language_preference=language_preference,
+                age_band=age_band,
+                ongoing_conditions=ongoing_conditions,
+                last_triage_outcome=last_triage_outcome,
+            )
+        except (sqlite3.Error, ValueError):
+            logger.exception("Caller memory save failed")
+            return {"status": "not_saved"}
+        return {"status": "saved", "caller": caller}
+
+    def _is_current_caller(self, user_id: str) -> bool:
+        return bool(self.caller_user_id and user_id == self.caller_user_id)
+
+
+def lookup_startup_memory(user_id: str) -> dict | None:
+    """Perform the same consented caller lookup before the agent's first reply."""
+    try:
+        record = memory_store.lookup(user_id)
+    except sqlite3.Error:
+        logger.exception("Caller memory startup lookup failed")
+        return None
+    logger.info("Caller memory startup lookup: %s", "found" if record else "not found")
+    return record
 
 
 server = AgentServer()
@@ -47,6 +135,17 @@ async def my_agent(ctx: JobContext):
     ctx.log_context_fields = {
         "room": ctx.room.name,
     }
+
+    try:
+        memory_store.initialize()
+    except sqlite3.Error:
+        logger.exception("Caller memory database initialization failed")
+
+    # Connect before reading participant identity; Room participants are not
+    # available until the LiveKit context is connected.
+    await ctx.connect()
+    caller_user_id = (await ctx.wait_for_participant()).identity
+    initial_caller_memory = lookup_startup_memory(caller_user_id)
 
     # Set up a voice AI pipeline using Murf Falcon, Gemini, Deepgram, and the LiveKit turn detector
     session = AgentSession(
@@ -144,7 +243,10 @@ async def my_agent(ctx: JobContext):
 
     # Start the session, which initializes the voice pipeline and warms up the models
     await session.start(
-        agent=Assistant(),
+        agent=Assistant(
+            caller_user_id=caller_user_id,
+            initial_caller_memory=initial_caller_memory,
+        ),
         room=ctx.room,
         room_options=room_io.RoomOptions(
             audio_input=room_io.AudioInputOptions(
@@ -157,10 +259,6 @@ async def my_agent(ctx: JobContext):
             ),
         ),
     )
-
-    # Join the room and connect to the user
-    await ctx.connect()
-
 
 if __name__ == "__main__":
     cli.run_app(server)
