@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -22,6 +23,7 @@ from livekit.plugins import deepgram, google, murf, noise_cancellation, silero
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 from caller_memory import CallerMemoryStore
+from health_access import assess_symptom_urgency, find_nearby_health_facilities
 from prompt import SYSTEM_PROMPT
 
 logger = logging.getLogger("agent")
@@ -100,6 +102,30 @@ class Assistant(Agent):
             logger.exception("Caller memory save failed")
             return {"status": "not_saved"}
         return {"status": "saved", "caller": caller}
+
+    @function_tool
+    async def assess_symptom_urgency(
+        self,
+        symptoms: str,
+        duration: str | None = None,
+        age_band: str | None = None,
+        pregnancy_or_high_risk: bool = False,
+    ) -> dict:
+        """Assess reported symptoms for a conservative, non-diagnostic urgency level. Use when a caller asks how urgently they should seek care or reports symptoms. Do not use for diagnosis, medicines, or emergencies requiring immediate escalation."""
+        return await asyncio.to_thread(
+            assess_symptom_urgency,
+            symptoms,
+            duration,
+            age_band,
+            pregnancy_or_high_risk,
+        )
+
+    @function_tool
+    async def find_nearby_health_facilities(
+        self, location: str, limit: int = 3
+    ) -> dict:
+        """Find nearby PHCs, clinics, doctors, and hospitals from live OpenStreetMap data. Use only when the caller asks where to go or requests nearby care and has provided a PIN code, locality, town, or landmark. Results are map listings, not confirmed availability."""
+        return await asyncio.to_thread(find_nearby_health_facilities, location, limit)
 
     def _is_current_caller(self, user_id: str) -> bool:
         return bool(self.caller_user_id and user_id == self.caller_user_id)

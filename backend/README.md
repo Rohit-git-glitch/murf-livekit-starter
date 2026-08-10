@@ -66,6 +66,23 @@ uv run python src/agent.py start
 
 ## Configuration
 
+## Health Access data and safety
+
+The agent includes two Health Access tools:
+
+- `assess_symptom_urgency` uses a small, deterministic and conservative rule
+  set to label reported symptoms as self-care, routine consultation, urgent
+  care, or emergency. It is general guidance only and never a diagnosis.
+- `find_nearby_health_facilities` queries live OpenStreetMap Nominatim and
+  Overpass data for nearby mapped PHCs, clinics, doctors, and hospitals. Each
+  response includes an India-time `data_checked_at` timestamp. Map data does
+  not confirm a facility's hours, capacity, or available services; callers
+  should contact it before travelling.
+
+Both live requests use a short timeout. If public map services cannot be
+reached, the agent says so, does not invent a facility, and gives safe next
+steps instead.
+
 All configuration lives in [`src/agent.py`](src/agent.py).
 
 ### System prompt
