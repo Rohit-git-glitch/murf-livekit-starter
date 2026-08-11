@@ -39,24 +39,47 @@ class Assistant(Agent):
         self,
         caller_user_id: str | None = None,
         initial_caller_memory: dict | None = None,
+        caller_info: dict | None = None,
     ) -> None:
         self.caller_user_id = caller_user_id
-        caller_context = (
-            f"\nThe current caller's user_id is `{caller_user_id}`."
-            if caller_user_id
-            else "\nNo stable caller user_id is available for this session."
+        self.caller_info = caller_info or {}
+
+        # Extract lookup_caller memory and specific instructions for the caller
+        lookercaller = (
+            self.caller_info.get("lookercaller")
+            or self.caller_info.get("lookup_caller")
+            or initial_caller_memory
         )
-        returning_caller_context = ""
-        if initial_caller_memory:
-            memory_json = json.dumps(initial_caller_memory, ensure_ascii=False)
-            returning_caller_context = (
-                "\nA verified startup lookup found this returning caller record: "
-                f"{memory_json}\nOn your first reply, welcome them back naturally by "
-                "name if it is present. Use these facts only when relevant and do not "
-                "claim anything beyond this record."
-            )
+        call_trigger = self.caller_info.get("call_trigger", "Health Access Outreach")
+        instructions = self.caller_info.get("instructions", "")
+
+        caller_context_parts = [
+            "\n\n========================",
+            "CALLER INFO & CALL INSTRUCTIONS",
+            "========================",
+            f"Caller User ID: `{caller_user_id or 'Unknown'}`",
+            f"Health Access Trigger: {call_trigger}",
+        ]
+
+        if lookercaller:
+            memory_json = json.dumps(lookercaller, ensure_ascii=False)
+            caller_context_parts.extend([
+                f"Lookup Caller Memory Record (lookercaller): {memory_json}",
+                "Instructions for Memory: Welcome the caller naturally by name if present in stored memory. Use these facts only when relevant and do not claim anything beyond this record."
+            ])
+        else:
+            caller_context_parts.append("Lookup Caller Memory Record (lookercaller): None (No prior consented memory record found)")
+
+        if instructions:
+            caller_context_parts.extend([
+                "\nInstructions for the Caller:",
+                instructions
+            ])
+
+        caller_context = "\n".join(caller_context_parts)
+
         super().__init__(
-            instructions=SYSTEM_PROMPT + caller_context + returning_caller_context
+            instructions=SYSTEM_PROMPT + caller_context
         )
 
     @function_tool
@@ -170,8 +193,42 @@ async def my_agent(ctx: JobContext):
     # Connect before reading participant identity; Room participants are not
     # available until the LiveKit context is connected.
     await ctx.connect()
-    caller_user_id = (await ctx.wait_for_participant()).identity
+    participant = await ctx.wait_for_participant()
+    caller_user_id = participant.identity
     initial_caller_memory = lookup_startup_memory(caller_user_id)
+
+    # Parse metadata passed during outbound/inbound call initiation
+    metadata_payload = {}
+    if participant.metadata:
+        try:
+            metadata_payload = json.loads(participant.metadata)
+        except json.JSONDecodeError:
+            metadata_payload = {"instructions": participant.metadata}
+    elif ctx.room.metadata:
+        try:
+            metadata_payload = json.loads(ctx.room.metadata)
+        except json.JSONDecodeError:
+            metadata_payload = {"instructions": ctx.room.metadata}
+
+    call_trigger = metadata_payload.get("call_trigger") or (
+        participant.attributes.get("call_trigger")
+        if participant.attributes
+        else "Health Access Outreach"
+    )
+    instructions = metadata_payload.get("instructions") or (
+        participant.attributes.get("instructions")
+        if participant.attributes
+        else ""
+    )
+
+    # Construct caller_info dictionary containing lookercaller/lookup_caller and instructions for caller
+    caller_info = {
+        "caller_user_id": caller_user_id,
+        "lookup_caller": initial_caller_memory,
+        "lookercaller": initial_caller_memory,
+        "call_trigger": call_trigger,
+        "instructions": instructions,
+    }
 
     # Set up a voice AI pipeline using Murf Falcon, Gemini, Deepgram, and the LiveKit turn detector
     session = AgentSession(
@@ -272,6 +329,7 @@ async def my_agent(ctx: JobContext):
         agent=Assistant(
             caller_user_id=caller_user_id,
             initial_caller_memory=initial_caller_memory,
+            caller_info=caller_info,
         ),
         room=ctx.room,
         room_options=room_io.RoomOptions(
@@ -286,5 +344,20 @@ async def my_agent(ctx: JobContext):
         ),
     )
 
+    # For outbound calls, the agent must speak first (patient is receiving the call).
+    # Detect outbound calls by checking if a call_trigger was set via metadata.
+    is_outbound = bool(
+        metadata_payload.get("call_trigger")
+        or (participant.attributes and participant.attributes.get("call_trigger"))
+    )
+    if is_outbound:
+        logger.info(
+            f"Outbound call detected (trigger: {call_trigger}). Agent speaking first."
+        )
+        await session.generate_reply(
+            instructions="You are initiating an outbound call. Greet the patient warmly, introduce yourself as Anisha from Aarogya AI, and immediately proceed with your call trigger instructions (medication reminder, vaccination reminder, or triage follow-up). Keep the greeting brief and natural."
+        )
+
 if __name__ == "__main__":
     cli.run_app(server)
+
