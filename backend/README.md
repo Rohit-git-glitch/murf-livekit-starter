@@ -83,6 +83,27 @@ Both live requests use a short timeout. If public map services cannot be
 reached, the agent says so, does not invent a facility, and gives safe next
 steps instead.
 
+## Day 7: human-help escalation
+
+Human-help requests are stored in the existing SQLite database in the
+`escalation_requests` table. The voice tool `create_escalation` can be used only
+after a caller explicitly agrees to share a concise summary. It stores the
+caller identifier/name, short current issue, what was checked, urgency,
+language, preferred follow-up method, status, timestamp, and an ID such as
+`ESC-20260812-A1B2`. It does not store transcripts or detailed medical notes.
+
+The agent offers escalation only for emergency/urgent red-flag triage and
+explicit diagnosis requests. Red-flag callers still receive immediate emergency
+or urgent-care advice; the request is not a replacement for care.
+
+To inspect open requests locally (access should be limited to authorised support
+staff), run:
+
+```bash
+cd backend
+uv run python src/escalation_requests.py
+```
+
 All configuration lives in [`src/agent.py`](src/agent.py).
 
 ### System prompt

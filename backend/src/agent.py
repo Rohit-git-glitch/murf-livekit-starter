@@ -23,6 +23,7 @@ from livekit.plugins import deepgram, google, murf, noise_cancellation, silero
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 from caller_memory import CallerMemoryStore
+from escalation import EscalationStore
 from health_access import assess_symptom_urgency, find_nearby_health_facilities
 from prompt import SYSTEM_PROMPT
 
@@ -32,6 +33,7 @@ load_dotenv(".env.local")
 
 DEFAULT_MEMORY_DB = Path(__file__).resolve().parent.parent / "data" / "callers.sqlite3"
 memory_store = CallerMemoryStore(os.getenv("CALLER_MEMORY_DB", DEFAULT_MEMORY_DB))
+escalation_store = EscalationStore(os.getenv("CALLER_MEMORY_DB", DEFAULT_MEMORY_DB))
 
 
 class Assistant(Agent):
@@ -144,6 +146,45 @@ class Assistant(Agent):
         )
 
     @function_tool
+    async def create_escalation(
+        self,
+        reason: str,
+        current_issue: str,
+        what_was_checked: str,
+        urgency: str,
+        language: str,
+        caller_confirmed_sharing: bool,
+        caller_name: str | None = None,
+        preferred_follow_up: str | None = None,
+    ) -> dict:
+        """Create a concise human-help request for the current caller.
+
+        Call this ONLY after the caller has clearly agreed to share the listed
+        information. Set caller_confirmed_sharing to true only for that clear,
+        current-turn consent. Valid reasons are red_flag_symptom and
+        diagnosis_request; urgency is high, urgent, or normal. Do not include
+        transcripts, passwords, OTPs, PINs, account numbers, or detailed notes.
+        """
+        if not self.caller_user_id:
+            return {
+                "success": False,
+                "status": "not_created",
+                "reason": "invalid_caller",
+            }
+        return await asyncio.to_thread(
+            escalation_store.create,
+            caller_id=self.caller_user_id,
+            caller_name=caller_name,
+            reason=reason,
+            current_issue=current_issue,
+            what_was_checked=what_was_checked,
+            urgency=urgency,
+            language=language,
+            preferred_follow_up=preferred_follow_up,
+            consent_given=caller_confirmed_sharing,
+        )
+
+    @function_tool
     async def find_nearby_health_facilities(
         self, location: str, limit: int = 3
     ) -> dict:
@@ -187,8 +228,9 @@ async def my_agent(ctx: JobContext):
 
     try:
         memory_store.initialize()
+        escalation_store.initialize()
     except sqlite3.Error:
-        logger.exception("Caller memory database initialization failed")
+        logger.exception("Caller data database initialization failed")
 
     # Connect before reading participant identity; Room participants are not
     # available until the LiveKit context is connected.
@@ -360,4 +402,3 @@ async def my_agent(ctx: JobContext):
 
 if __name__ == "__main__":
     cli.run_app(server)
-
