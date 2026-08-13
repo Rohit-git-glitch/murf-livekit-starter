@@ -1,35 +1,37 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  useSessionContext,
-  useAgent,
-  useSessionMessages,
-  useTrackVolume,
-  SessionEvent,
-  useChat,
-  type ReceivedMessage,
-} from '@livekit/components-react';
-import {
+  Activity,
+  AlertCircle,
+  BarChart3,
+  Bot,
+  CheckCircle2,
+  HeartPulse,
+  Loader2,
+  MessageSquareText,
   Mic,
   MicOff,
   PhoneOff,
   RefreshCw,
-  HeartPulse,
-  Activity,
-  ShieldAlert,
-  MessageSquareText,
-  Loader2,
-  CheckCircle2,
-  Sparkles,
-  Volume2,
   SendHorizontal,
-  AlertCircle,
-  X,
+  ShieldAlert,
+  Sparkles,
   User,
-  Bot,
+  Volume2,
+  X,
 } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
+import {
+  type ReceivedMessage,
+  SessionEvent,
+  useAgent,
+  useChat,
+  useSessionContext,
+  useSessionMessages,
+  useTrackVolume,
+} from '@livekit/components-react';
+import { CallAnalyticsDashboard } from '@/components/app/call-analytics-dashboard';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/shadcn/utils';
 
@@ -79,8 +81,8 @@ function TranscriptPanel({
   return (
     <div className="flex h-full flex-col">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-teal-200/60 dark:border-teal-800/60 px-4 py-3 shrink-0">
-        <h3 className="font-semibold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+      <div className="flex shrink-0 items-center justify-between border-b border-teal-200/60 px-4 py-3 dark:border-teal-800/60">
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-900 dark:text-white">
           <MessageSquareText className="h-4 w-4 text-teal-600 dark:text-teal-400" />
           Live Transcript
         </h3>
@@ -97,15 +99,15 @@ function TranscriptPanel({
       {/* Messages */}
       <div
         ref={scrollRef}
-        className="flex-1 overflow-y-auto px-4 py-3 space-y-3 [scrollbar-width:thin]"
+        className="flex-1 space-y-3 overflow-y-auto px-4 py-3 [scrollbar-width:thin]"
       >
         {messages.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-full text-center py-12">
-            <MessageSquareText className="h-8 w-8 text-slate-300 dark:text-slate-600 mb-3" />
-            <p className="text-sm text-slate-400 dark:text-slate-500 font-medium">
+          <div className="flex h-full flex-col items-center justify-center py-12 text-center">
+            <MessageSquareText className="mb-3 h-8 w-8 text-slate-300 dark:text-slate-600" />
+            <p className="text-sm font-medium text-slate-400 dark:text-slate-500">
               Transcript will appear here
             </p>
-            <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+            <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
               Start speaking to see the conversation.
             </p>
           </div>
@@ -116,25 +118,18 @@ function TranscriptPanel({
           return (
             <div
               key={msg.id}
-              className={cn(
-                'flex gap-2.5 text-sm',
-                isUser ? 'flex-row-reverse' : 'flex-row'
-              )}
+              className={cn('flex gap-2.5 text-sm', isUser ? 'flex-row-reverse' : 'flex-row')}
             >
               {/* Avatar */}
               <div
                 className={cn(
                   'flex h-7 w-7 shrink-0 items-center justify-center rounded-full',
                   isUser
-                    ? 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                    : 'bg-teal-100 dark:bg-teal-900/60 text-teal-700 dark:text-teal-300'
+                    ? 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+                    : 'bg-teal-100 text-teal-700 dark:bg-teal-900/60 dark:text-teal-300'
                 )}
               >
-                {isUser ? (
-                  <User className="h-3.5 w-3.5" />
-                ) : (
-                  <Bot className="h-3.5 w-3.5" />
-                )}
+                {isUser ? <User className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
               </div>
 
               {/* Bubble */}
@@ -142,11 +137,11 @@ function TranscriptPanel({
                 className={cn(
                   'max-w-[85%] rounded-2xl px-3.5 py-2 text-[13px] leading-relaxed',
                   isUser
-                    ? 'bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-tr-sm'
-                    : 'bg-teal-50 dark:bg-teal-950/60 text-slate-800 dark:text-slate-200 border border-teal-100 dark:border-teal-900/40 rounded-tl-sm'
+                    ? 'rounded-tr-sm bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200'
+                    : 'rounded-tl-sm border border-teal-100 bg-teal-50 text-slate-800 dark:border-teal-900/40 dark:bg-teal-950/60 dark:text-slate-200'
                 )}
               >
-                <p className="text-[10px] font-semibold mb-0.5 text-slate-400 dark:text-slate-500">
+                <p className="mb-0.5 text-[10px] font-semibold text-slate-400 dark:text-slate-500">
                   {isUser ? 'You' : 'Anisha'}
                 </p>
                 {msg.message}
@@ -158,14 +153,14 @@ function TranscriptPanel({
         {/* Thinking indicator */}
         {agentState === 'thinking' && (
           <div className="flex gap-2.5 text-sm">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-teal-100 dark:bg-teal-900/60 text-teal-700 dark:text-teal-300">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-teal-100 text-teal-700 dark:bg-teal-900/60 dark:text-teal-300">
               <Bot className="h-3.5 w-3.5" />
             </div>
-            <div className="bg-teal-50 dark:bg-teal-950/60 border border-teal-100 dark:border-teal-900/40 rounded-2xl rounded-tl-sm px-4 py-2.5">
+            <div className="rounded-2xl rounded-tl-sm border border-teal-100 bg-teal-50 px-4 py-2.5 dark:border-teal-900/40 dark:bg-teal-950/60">
               <div className="flex items-center gap-1">
-                <span className="h-1.5 w-1.5 rounded-full bg-teal-500 animate-bounce [animation-delay:0ms]" />
-                <span className="h-1.5 w-1.5 rounded-full bg-teal-500 animate-bounce [animation-delay:150ms]" />
-                <span className="h-1.5 w-1.5 rounded-full bg-teal-500 animate-bounce [animation-delay:300ms]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-teal-500 [animation-delay:0ms]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-teal-500 [animation-delay:150ms]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-teal-500 [animation-delay:300ms]" />
               </div>
             </div>
           </div>
@@ -189,7 +184,11 @@ function TranscriptPanel({
             disabled={isSending || draft.trim().length === 0}
             className="h-10 rounded-xl bg-teal-600 text-white hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isSending ? <Loader2 className="h-4 w-4 animate-spin" /> : <SendHorizontal className="h-4 w-4" />}
+            {isSending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <SendHorizontal className="h-4 w-4" />
+            )}
           </Button>
         </div>
       </div>
@@ -209,6 +208,7 @@ export function AarogyaHealthView() {
   const [callEnded, setCallEnded] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
 
   // Monitor LiveKit Session media errors
   useEffect(() => {
@@ -301,7 +301,12 @@ export function AarogyaHealthView() {
     } else {
       currentState = 'listening';
     }
-  } else if (isConnecting || session.connectionState === 'connecting' || agent.state === 'connecting' || agent.state === 'initializing') {
+  } else if (
+    isConnecting ||
+    session.connectionState === 'connecting' ||
+    agent.state === 'connecting' ||
+    agent.state === 'initializing'
+  ) {
     currentState = 'connecting';
   } else if (callEnded) {
     currentState = 'ended';
@@ -309,9 +314,12 @@ export function AarogyaHealthView() {
     currentState = 'ready';
   }
 
-  return (
-    <div className="relative h-svh w-full flex overflow-hidden bg-gradient-to-b from-teal-50/60 via-slate-50 to-emerald-50/40 dark:from-slate-950 dark:via-slate-900 dark:to-teal-950/40 text-slate-800 dark:text-slate-100 transition-colors duration-300">
+  if (analyticsOpen) {
+    return <CallAnalyticsDashboard onBack={() => setAnalyticsOpen(false)} />;
+  }
 
+  return (
+    <div className="relative flex h-svh w-full overflow-hidden bg-gradient-to-b from-teal-50/60 via-slate-50 to-emerald-50/40 text-slate-800 transition-colors duration-300 dark:from-slate-950 dark:via-slate-900 dark:to-teal-950/40 dark:text-slate-100">
       {/* Background Decorative Elements */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute -top-32 -left-32 h-96 w-96 rounded-full bg-teal-400/10 blur-3xl dark:bg-teal-500/10" />
@@ -320,60 +328,74 @@ export function AarogyaHealthView() {
       </div>
 
       {/* ─── LEFT: Main Content Area ─── */}
-      <div className={cn(
-        "relative z-10 flex flex-col items-center justify-between p-4 sm:p-6 md:p-8 overflow-y-auto transition-all duration-300",
-        chatOpen ? "w-full md:w-[60%] lg:w-[65%]" : "w-full"
-      )}>
-
+      <div
+        className={cn(
+          'relative z-10 flex flex-col items-center justify-between overflow-y-auto p-4 transition-all duration-300 sm:p-6 md:p-8',
+          chatOpen ? 'w-full md:w-[60%] lg:w-[65%]' : 'w-full'
+        )}
+      >
         {/* Top Bar: Brand Badge & Transcript Toggle */}
-        <header className="w-full max-w-4xl flex items-center justify-between pt-2 pb-4">
+        <header className="flex w-full max-w-4xl items-center justify-between pt-2 pb-4">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-teal-600 text-white shadow-md shadow-teal-600/20 dark:bg-teal-500">
               <HeartPulse className="h-6 w-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-bold text-lg tracking-tight text-slate-900 dark:text-white">
+                <span className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">
                   Aarogya AI
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-full bg-teal-100 dark:bg-teal-900/60 px-2.5 py-0.5 text-xs font-semibold text-teal-800 dark:text-teal-300">
+                <span className="inline-flex items-center gap-1 rounded-full bg-teal-100 px-2.5 py-0.5 text-xs font-semibold text-teal-800 dark:bg-teal-900/60 dark:text-teal-300">
                   <Sparkles className="h-3 w-3" /> Health Access
                 </span>
               </div>
               <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                Assistant: <strong className="text-teal-700 dark:text-teal-400 font-semibold">Anisha</strong>
+                Assistant:{' '}
+                <strong className="font-semibold text-teal-700 dark:text-teal-400">Anisha</strong>
               </p>
             </div>
           </div>
 
           {/* Transcript Toggle Button — visible during active session */}
+          {!session.isConnected && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAnalyticsOpen(true)}
+              className="rounded-full border-teal-200 bg-white/80 text-teal-800 shadow-xs transition-colors hover:bg-teal-50 dark:border-teal-800 dark:bg-slate-900/80 dark:text-teal-300 dark:hover:bg-teal-900/40"
+            >
+              <BarChart3 className="mr-1.5 h-4 w-4" />
+              Analytics
+            </Button>
+          )}
           {session.isConnected && (
             <Button
               variant="outline"
               size="sm"
               onClick={() => setChatOpen(!chatOpen)}
               className={cn(
-                "rounded-full border-teal-200 dark:border-teal-800 bg-white/80 dark:bg-slate-900/80 text-teal-800 dark:text-teal-300 hover:bg-teal-50 dark:hover:bg-teal-900/40 shadow-xs transition-colors",
-                chatOpen && "bg-teal-100 dark:bg-teal-900/60 border-teal-300 dark:border-teal-700"
+                'rounded-full border-teal-200 bg-white/80 text-teal-800 shadow-xs transition-colors hover:bg-teal-50 dark:border-teal-800 dark:bg-slate-900/80 dark:text-teal-300 dark:hover:bg-teal-900/40',
+                chatOpen && 'border-teal-300 bg-teal-100 dark:border-teal-700 dark:bg-teal-900/60'
               )}
             >
-              <MessageSquareText className="h-4 w-4 mr-1.5" />
-              <span className="hidden sm:inline">{chatOpen ? 'Hide Transcript' : 'View Transcript'}</span>
+              <MessageSquareText className="mr-1.5 h-4 w-4" />
+              <span className="hidden sm:inline">
+                {chatOpen ? 'Hide Transcript' : 'View Transcript'}
+              </span>
               <span className="sm:hidden">{chatOpen ? 'Hide' : 'Transcript'}</span>
             </Button>
           )}
         </header>
 
         {/* Main Center Card */}
-        <main className="my-auto w-full max-w-lg flex flex-col items-center">
-          <div className="w-full rounded-3xl border border-teal-100 dark:border-teal-900/50 bg-white/85 dark:bg-slate-900/85 p-6 sm:p-8 shadow-xl shadow-teal-950/5 backdrop-blur-xl transition-all">
-
+        <main className="my-auto flex w-full max-w-lg flex-col items-center">
+          <div className="w-full rounded-3xl border border-teal-100 bg-white/85 p-6 shadow-xl shadow-teal-950/5 backdrop-blur-xl transition-all sm:p-8 dark:border-teal-900/50 dark:bg-slate-900/85">
             {/* Main Product Header & Copy */}
-            <div className="text-center mb-6 sm:mb-8">
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 dark:text-white mb-2">
+            <div className="mb-6 text-center sm:mb-8">
+              <h1 className="mb-2 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
                 Aarogya AI
               </h1>
-              <p className="text-base sm:text-lg font-semibold text-teal-700 dark:text-teal-300 mb-1">
+              <p className="mb-1 text-base font-semibold text-teal-700 sm:text-lg dark:text-teal-300">
                 Your Voice Assistant for Better Health Access
               </p>
               <p className="text-sm text-slate-600 dark:text-slate-300">
@@ -383,22 +405,21 @@ export function AarogyaHealthView() {
 
             {/* Dynamic 5 States Display Area */}
             <div className="flex flex-col items-center justify-center py-4">
-
               {/* STATE 1: READY */}
               {currentState === 'ready' && (
                 <motion.div
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  className="flex flex-col items-center text-center w-full"
+                  className="flex w-full flex-col items-center text-center"
                 >
-                  <div className="relative mb-6 flex h-32 w-32 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800/80 border border-teal-100 dark:border-teal-900/40 shadow-inner">
-                    <div className="absolute inset-0 rounded-full bg-teal-500/10 animate-pulse" />
+                  <div className="relative mb-6 flex h-32 w-32 items-center justify-center rounded-full border border-teal-100 bg-slate-100 shadow-inner dark:border-teal-900/40 dark:bg-slate-800/80">
+                    <div className="absolute inset-0 animate-pulse rounded-full bg-teal-500/10" />
                     <Mic className="h-12 w-12 text-slate-400 dark:text-slate-500" />
                   </div>
 
                   <div className="mb-6">
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 dark:bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300 mb-2">
+                    <span className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                       <span className="h-2 w-2 rounded-full bg-slate-400" />
                       Agent Ready
                     </span>
@@ -410,7 +431,7 @@ export function AarogyaHealthView() {
                   <Button
                     size="lg"
                     onClick={handleStartCall}
-                    className="w-full h-14 rounded-2xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-bold text-base shadow-lg shadow-teal-600/25 transition-all hover:scale-[1.01] active:scale-[0.99]"
+                    className="h-14 w-full rounded-2xl bg-gradient-to-r from-teal-600 to-emerald-600 text-base font-bold text-white shadow-lg shadow-teal-600/25 transition-all hover:scale-[1.01] hover:from-teal-700 hover:to-emerald-700 active:scale-[0.99]"
                   >
                     <Mic className="mr-2 h-5 w-5" />
                     Start Conversation
@@ -424,22 +445,22 @@ export function AarogyaHealthView() {
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  className="flex flex-col items-center text-center w-full"
+                  className="flex w-full flex-col items-center text-center"
                 >
                   <div className="relative mb-6 flex h-32 w-32 items-center justify-center">
-                    <div className="absolute inset-0 rounded-full border-4 border-teal-200 dark:border-teal-900 opacity-30" />
-                    <div className="absolute inset-0 rounded-full border-4 border-teal-600 dark:border-teal-400 border-t-transparent animate-spin" />
-                    <div className="h-16 w-16 rounded-full bg-teal-500/10 flex items-center justify-center animate-pulse">
+                    <div className="absolute inset-0 rounded-full border-4 border-teal-200 opacity-30 dark:border-teal-900" />
+                    <div className="absolute inset-0 animate-spin rounded-full border-4 border-teal-600 border-t-transparent dark:border-teal-400" />
+                    <div className="flex h-16 w-16 animate-pulse items-center justify-center rounded-full bg-teal-500/10">
                       <Activity className="h-8 w-8 text-teal-600 dark:text-teal-400" />
                     </div>
                   </div>
 
                   <div className="mb-6">
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-teal-50 dark:bg-teal-950/80 px-3 py-1 text-xs font-semibold text-teal-700 dark:text-teal-300 mb-2 border border-teal-200/60 dark:border-teal-800/60">
+                    <span className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-teal-200/60 bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-700 dark:border-teal-800/60 dark:bg-teal-950/80 dark:text-teal-300">
                       <Loader2 className="h-3 w-3 animate-spin" />
                       Connecting
                     </span>
-                    <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-1">
+                    <h2 className="mb-1 text-xl font-bold text-slate-900 dark:text-white">
                       Connecting to Anisha...
                     </h2>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -450,7 +471,7 @@ export function AarogyaHealthView() {
                   <Button
                     disabled
                     size="lg"
-                    className="w-full h-14 rounded-2xl bg-teal-700/60 text-white font-semibold text-base cursor-not-allowed opacity-80"
+                    className="h-14 w-full cursor-not-allowed rounded-2xl bg-teal-700/60 text-base font-semibold text-white opacity-80"
                   >
                     <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                     Connecting...
@@ -464,22 +485,22 @@ export function AarogyaHealthView() {
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  className="flex flex-col items-center text-center w-full"
+                  className="flex w-full flex-col items-center text-center"
                 >
                   <div className="relative mb-6 flex h-32 w-32 items-center justify-center">
-                    <div className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping" />
-                    <div className="absolute -inset-2 rounded-full bg-emerald-500/10 animate-pulse" />
-                    <div className="relative h-24 w-24 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-lg shadow-emerald-600/30">
+                    <div className="absolute inset-0 animate-ping rounded-full bg-emerald-500/20" />
+                    <div className="absolute -inset-2 animate-pulse rounded-full bg-emerald-500/10" />
+                    <div className="relative flex h-24 w-24 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg shadow-emerald-600/30">
                       <Mic className="h-10 w-10 animate-bounce" />
                     </div>
                   </div>
 
                   <div className="mb-6">
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 dark:bg-emerald-950/80 px-3 py-1 text-xs font-semibold text-emerald-800 dark:text-emerald-300 mb-2 border border-emerald-200 dark:border-emerald-800">
-                      <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300">
+                      <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
                       Microphone Active
                     </span>
-                    <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-1">
+                    <h2 className="mb-1 text-xl font-bold text-slate-900 dark:text-white">
                       Anisha is listening to you...
                     </h2>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -488,20 +509,24 @@ export function AarogyaHealthView() {
                   </div>
 
                   {/* Call Control Bar */}
-                  <div className="flex items-center gap-3 w-full">
+                  <div className="flex w-full items-center gap-3">
                     <Button
                       variant={isMuted ? 'destructive' : 'outline'}
                       onClick={toggleMute}
-                      className="flex-1 h-12 rounded-xl font-semibold border-slate-200 dark:border-slate-700"
+                      className="h-12 flex-1 rounded-xl border-slate-200 font-semibold dark:border-slate-700"
                     >
-                      {isMuted ? <MicOff className="mr-2 h-4 w-4" /> : <Mic className="mr-2 h-4 w-4 text-emerald-600" />}
+                      {isMuted ? (
+                        <MicOff className="mr-2 h-4 w-4" />
+                      ) : (
+                        <Mic className="mr-2 h-4 w-4 text-emerald-600" />
+                      )}
                       {isMuted ? 'Muted' : 'Mute Mic'}
                     </Button>
 
                     <Button
                       variant="destructive"
                       onClick={handleEndCall}
-                      className="flex-1 h-12 rounded-xl bg-rose-600 hover:bg-rose-700 font-semibold shadow-md shadow-rose-600/20"
+                      className="h-12 flex-1 rounded-xl bg-rose-600 font-semibold shadow-md shadow-rose-600/20 hover:bg-rose-700"
                     >
                       <PhoneOff className="mr-2 h-4 w-4" />
                       End Call
@@ -516,25 +541,25 @@ export function AarogyaHealthView() {
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  className="flex flex-col items-center text-center w-full"
+                  className="flex w-full flex-col items-center text-center"
                 >
-                  <div className="relative mb-6 flex h-32 w-32 items-center justify-center rounded-full bg-gradient-to-br from-teal-500/10 via-cyan-500/10 to-emerald-500/20 border-2 border-cyan-400/40 shadow-lg shadow-cyan-500/10">
-                    <div className="absolute inset-0 rounded-full border border-cyan-400/30 animate-ping" />
-                    <div className="flex items-center justify-center gap-1.5 h-16 w-20">
-                      <span className="w-2 bg-cyan-500 rounded-full animate-[bounce_1s_infinite_100ms] h-8" />
-                      <span className="w-2 bg-teal-500 rounded-full animate-[bounce_1s_infinite_300ms] h-12" />
-                      <span className="w-2 bg-emerald-500 rounded-full animate-[bounce_1s_infinite_200ms] h-16" />
-                      <span className="w-2 bg-teal-500 rounded-full animate-[bounce_1s_infinite_400ms] h-10" />
-                      <span className="w-2 bg-cyan-500 rounded-full animate-[bounce_1s_infinite_150ms] h-6" />
+                  <div className="relative mb-6 flex h-32 w-32 items-center justify-center rounded-full border-2 border-cyan-400/40 bg-gradient-to-br from-teal-500/10 via-cyan-500/10 to-emerald-500/20 shadow-lg shadow-cyan-500/10">
+                    <div className="absolute inset-0 animate-ping rounded-full border border-cyan-400/30" />
+                    <div className="flex h-16 w-20 items-center justify-center gap-1.5">
+                      <span className="h-8 w-2 animate-[bounce_1s_infinite_100ms] rounded-full bg-cyan-500" />
+                      <span className="h-12 w-2 animate-[bounce_1s_infinite_300ms] rounded-full bg-teal-500" />
+                      <span className="h-16 w-2 animate-[bounce_1s_infinite_200ms] rounded-full bg-emerald-500" />
+                      <span className="h-10 w-2 animate-[bounce_1s_infinite_400ms] rounded-full bg-teal-500" />
+                      <span className="h-6 w-2 animate-[bounce_1s_infinite_150ms] rounded-full bg-cyan-500" />
                     </div>
                   </div>
 
                   <div className="mb-6">
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-cyan-100 dark:bg-cyan-950/80 px-3 py-1 text-xs font-semibold text-cyan-800 dark:text-cyan-300 mb-2 border border-cyan-200 dark:border-cyan-800">
+                    <span className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-cyan-200 bg-cyan-100 px-3 py-1 text-xs font-semibold text-cyan-800 dark:border-cyan-800 dark:bg-cyan-950/80 dark:text-cyan-300">
                       <Volume2 className="h-3 w-3 animate-pulse" />
                       Anisha Responding
                     </span>
-                    <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-1">
+                    <h2 className="mb-1 text-xl font-bold text-slate-900 dark:text-white">
                       Anisha is speaking...
                     </h2>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -542,20 +567,24 @@ export function AarogyaHealthView() {
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-3 w-full">
+                  <div className="flex w-full items-center gap-3">
                     <Button
                       variant={isMuted ? 'destructive' : 'outline'}
                       onClick={toggleMute}
-                      className="flex-1 h-12 rounded-xl font-semibold border-slate-200 dark:border-slate-700"
+                      className="h-12 flex-1 rounded-xl border-slate-200 font-semibold dark:border-slate-700"
                     >
-                      {isMuted ? <MicOff className="mr-2 h-4 w-4" /> : <Mic className="mr-2 h-4 w-4 text-teal-600" />}
+                      {isMuted ? (
+                        <MicOff className="mr-2 h-4 w-4" />
+                      ) : (
+                        <Mic className="mr-2 h-4 w-4 text-teal-600" />
+                      )}
                       {isMuted ? 'Muted' : 'Mute Mic'}
                     </Button>
 
                     <Button
                       variant="destructive"
                       onClick={handleEndCall}
-                      className="flex-1 h-12 rounded-xl bg-rose-600 hover:bg-rose-700 font-semibold shadow-md shadow-rose-600/20"
+                      className="h-12 flex-1 rounded-xl bg-rose-600 font-semibold shadow-md shadow-rose-600/20 hover:bg-rose-700"
                     >
                       <PhoneOff className="mr-2 h-4 w-4" />
                       End Call
@@ -570,17 +599,17 @@ export function AarogyaHealthView() {
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  className="flex flex-col items-center text-center w-full"
+                  className="flex w-full flex-col items-center text-center"
                 >
-                  <div className="relative mb-6 flex h-32 w-32 items-center justify-center rounded-full bg-teal-50 dark:bg-teal-950/50 border border-teal-200 dark:border-teal-800">
+                  <div className="relative mb-6 flex h-32 w-32 items-center justify-center rounded-full border border-teal-200 bg-teal-50 dark:border-teal-800 dark:bg-teal-950/50">
                     <CheckCircle2 className="h-16 w-16 text-teal-600 dark:text-teal-400" />
                   </div>
 
                   <div className="mb-6">
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 dark:bg-slate-800 px-3 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300 mb-2">
+                    <span className="mb-2 inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 dark:bg-slate-800 dark:text-slate-300">
                       Session Completed
                     </span>
-                    <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-1">
+                    <h2 className="mb-1 text-xl font-bold text-slate-900 dark:text-white">
                       Conversation ended
                     </h2>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -591,7 +620,7 @@ export function AarogyaHealthView() {
                   <Button
                     size="lg"
                     onClick={handleStartCall}
-                    className="w-full h-14 rounded-2xl bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-bold text-base shadow-lg shadow-teal-600/25 transition-all hover:scale-[1.01] active:scale-[0.99]"
+                    className="h-14 w-full rounded-2xl bg-gradient-to-r from-teal-600 to-emerald-600 text-base font-bold text-white shadow-lg shadow-teal-600/25 transition-all hover:scale-[1.01] hover:from-teal-700 hover:to-emerald-700 active:scale-[0.99]"
                   >
                     <RefreshCw className="mr-2 h-5 w-5" />
                     Start Again
@@ -605,21 +634,21 @@ export function AarogyaHealthView() {
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  className="flex flex-col items-center text-center w-full"
+                  className="flex w-full flex-col items-center text-center"
                 >
-                  <div className="relative mb-6 flex h-32 w-32 items-center justify-center rounded-full bg-amber-50 dark:bg-amber-950/40 border-2 border-amber-300 dark:border-amber-700">
+                  <div className="relative mb-6 flex h-32 w-32 items-center justify-center rounded-full border-2 border-amber-300 bg-amber-50 dark:border-amber-700 dark:bg-amber-950/40">
                     <MicOff className="h-14 w-14 text-amber-600 dark:text-amber-400" />
                   </div>
 
                   <div className="mb-6 max-w-sm">
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 dark:bg-amber-950/80 px-3 py-1 text-xs font-semibold text-amber-800 dark:text-amber-300 mb-2 border border-amber-300/60 dark:border-amber-700/60">
+                    <span className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-amber-300/60 bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 dark:border-amber-700/60 dark:bg-amber-950/80 dark:text-amber-300">
                       <AlertCircle className="h-3.5 w-3.5" />
                       Permission Blocked
                     </span>
-                    <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
+                    <h2 className="mb-2 text-xl font-bold text-slate-900 dark:text-white">
                       Microphone access is blocked.
                     </h2>
-                    <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                    <p className="text-xs leading-relaxed text-slate-600 sm:text-sm dark:text-slate-300">
                       Please allow microphone access in your browser settings and try again.
                     </p>
                   </div>
@@ -627,22 +656,21 @@ export function AarogyaHealthView() {
                   <Button
                     size="lg"
                     onClick={handleStartCall}
-                    className="w-full h-14 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-base shadow-lg shadow-amber-600/25 transition-all hover:scale-[1.01] active:scale-[0.99]"
+                    className="h-14 w-full rounded-2xl bg-amber-600 text-base font-bold text-white shadow-lg shadow-amber-600/25 transition-all hover:scale-[1.01] hover:bg-amber-700 active:scale-[0.99]"
                   >
                     <RefreshCw className="mr-2 h-5 w-5" />
                     Try Again
                   </Button>
                 </motion.div>
               )}
-
             </div>
           </div>
         </main>
 
         {/* Safety Disclaimer Footer */}
         <footer className="my-4 w-full max-w-lg text-center">
-          <div className="inline-flex items-center justify-center gap-2 rounded-xl bg-teal-900/5 dark:bg-teal-100/5 px-4 py-2.5 border border-teal-900/10 dark:border-teal-100/10">
-            <ShieldAlert className="h-4 w-4 text-teal-700 dark:text-teal-400 shrink-0" />
+          <div className="inline-flex items-center justify-center gap-2 rounded-xl border border-teal-900/10 bg-teal-900/5 px-4 py-2.5 dark:border-teal-100/10 dark:bg-teal-100/5">
+            <ShieldAlert className="h-4 w-4 shrink-0 text-teal-700 dark:text-teal-400" />
             <p className="text-xs font-medium text-slate-600 dark:text-slate-300">
               For general health information. Not a replacement for a doctor.
             </p>
@@ -659,7 +687,7 @@ export function AarogyaHealthView() {
             animate={{ width: 'auto', opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
             transition={{ duration: 0.3, ease: 'easeInOut' }}
-            className="relative z-20 h-full shrink-0 overflow-hidden border-l border-teal-200/60 dark:border-teal-800/50 bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl shadow-[-4px_0_24px_rgba(0,0,0,0.05)]"
+            className="relative z-20 h-full shrink-0 overflow-hidden border-l border-teal-200/60 bg-white/95 shadow-[-4px_0_24px_rgba(0,0,0,0.05)] backdrop-blur-xl dark:border-teal-800/50 dark:bg-slate-900/95"
           >
             <div className="h-full w-[340px] md:w-[380px] lg:w-[400px]">
               <TranscriptPanel
@@ -694,7 +722,7 @@ export function AarogyaHealthView() {
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ duration: 0.3, ease: 'easeInOut' }}
-            className="fixed top-0 right-0 z-40 h-full w-[85vw] max-w-[380px] border-l border-teal-200/60 dark:border-teal-800/50 bg-white dark:bg-slate-900 shadow-2xl md:hidden"
+            className="fixed top-0 right-0 z-40 h-full w-[85vw] max-w-[380px] border-l border-teal-200/60 bg-white shadow-2xl md:hidden dark:border-teal-800/50 dark:bg-slate-900"
           >
             <TranscriptPanel
               messages={messages}
@@ -705,7 +733,6 @@ export function AarogyaHealthView() {
           </motion.aside>
         )}
       </AnimatePresence>
-
     </div>
   );
 }

@@ -22,6 +22,8 @@ from livekit.agents import (
 from livekit.plugins import deepgram, google, murf, noise_cancellation, silero
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
+from analytics_api import start_analytics_server
+from call_analytics import CallAnalyticsStore, CallOutcomeTracker
 from caller_memory import CallerMemoryStore
 from escalation import EscalationStore
 from health_access import assess_symptom_urgency, find_nearby_health_facilities
@@ -34,6 +36,7 @@ load_dotenv(".env.local")
 DEFAULT_MEMORY_DB = Path(__file__).resolve().parent.parent / "data" / "callers.sqlite3"
 memory_store = CallerMemoryStore(os.getenv("CALLER_MEMORY_DB", DEFAULT_MEMORY_DB))
 escalation_store = EscalationStore(os.getenv("CALLER_MEMORY_DB", DEFAULT_MEMORY_DB))
+analytics_store = CallAnalyticsStore(os.getenv("CALLER_MEMORY_DB", DEFAULT_MEMORY_DB))
 
 
 class Assistant(Agent):
@@ -42,9 +45,11 @@ class Assistant(Agent):
         caller_user_id: str | None = None,
         initial_caller_memory: dict | None = None,
         caller_info: dict | None = None,
+        call_outcome_tracker: CallOutcomeTracker | None = None,
     ) -> None:
         self.caller_user_id = caller_user_id
         self.caller_info = caller_info or {}
+        self.call_outcome_tracker = call_outcome_tracker
 
         # Extract lookup_caller memory and specific instructions for the caller
         lookercaller = (
@@ -185,6 +190,22 @@ class Assistant(Agent):
         )
 
     @function_tool
+    async def record_safe_guidance_provided(self) -> dict:
+        """Mark this call successful only when your current reply gives safe general guidance and a suitable next step. Do not call for greetings, incomplete conversations, or unanswered questions."""
+        if self.call_outcome_tracker is None:
+            return {"status": "unavailable"}
+        self.call_outcome_tracker.mark_safe_guidance_provided()
+        return {"status": "recorded"}
+
+    @function_tool
+    async def record_escalation_communicated(self) -> dict:
+        """Mark this call successful only after you clearly direct the caller to appropriate emergency, medical, or human help. Do not call before communicating that direction."""
+        if self.call_outcome_tracker is None:
+            return {"status": "unavailable"}
+        self.call_outcome_tracker.mark_escalation_communicated()
+        return {"status": "recorded"}
+
+    @function_tool
     async def find_nearby_health_facilities(
         self, location: str, limit: int = 3
     ) -> dict:
@@ -229,6 +250,7 @@ async def my_agent(ctx: JobContext):
     try:
         memory_store.initialize()
         escalation_store.initialize()
+        analytics_store.initialize()
     except sqlite3.Error:
         logger.exception("Caller data database initialization failed")
 
@@ -273,6 +295,7 @@ async def my_agent(ctx: JobContext):
     }
 
     # Set up a voice AI pipeline using Murf Falcon, Gemini, Deepgram, and the LiveKit turn detector
+    call_outcome_tracker = CallOutcomeTracker()
     session = AgentSession(
         # Speech-to-text (STT) is your agent's ears, turning the user's speech into text that the LLM can understand
         # See all available models at https://docs.livekit.io/agents/models/stt/
@@ -372,6 +395,7 @@ async def my_agent(ctx: JobContext):
             caller_user_id=caller_user_id,
             initial_caller_memory=initial_caller_memory,
             caller_info=caller_info,
+            call_outcome_tracker=call_outcome_tracker,
         ),
         room=ctx.room,
         room_options=room_io.RoomOptions(
@@ -385,6 +409,18 @@ async def my_agent(ctx: JobContext):
             ),
         ),
     )
+
+    async def record_completed_call(_: str) -> None:
+        """Persist one final outcome even when the caller disconnects unexpectedly."""
+        try:
+            analytics_store.record_call_outcome(
+                call_id=ctx.room.name,
+                outcome=call_outcome_tracker.outcome,
+            )
+        except (sqlite3.Error, ValueError):
+            logger.exception("Call outcome storage failed for room %s", ctx.room.name)
+
+    ctx.add_shutdown_callback(record_completed_call)
 
     # For outbound calls, the agent must speak first (patient is receiving the call).
     # Detect outbound calls by checking if a call_trigger was set via metadata.
@@ -401,4 +437,11 @@ async def my_agent(ctx: JobContext):
         )
 
 if __name__ == "__main__":
+    try:
+        analytics_store.initialize()
+        analytics_host = os.getenv("ANALYTICS_HOST", "127.0.0.1")
+        analytics_port = int(os.getenv("ANALYTICS_PORT", "8081"))
+        start_analytics_server(analytics_store, analytics_host, analytics_port)
+    except (sqlite3.Error, ValueError):
+        logger.exception("Call analytics API startup failed")
     cli.run_app(server)
