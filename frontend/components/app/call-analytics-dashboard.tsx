@@ -19,8 +19,8 @@ export function CallAnalyticsDashboard({ onBack }: CallAnalyticsDashboardProps) 
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const loadAnalytics = useCallback(async () => {
-    setIsLoading(true);
+  const loadAnalytics = useCallback(async (showLoading = true) => {
+    if (showLoading) setIsLoading(true);
     setError(null);
 
     try {
@@ -35,12 +35,16 @@ export function CallAnalyticsDashboard({ onBack }: CallAnalyticsDashboardProps) 
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Unable to load call analytics.');
     } finally {
-      setIsLoading(false);
+      if (showLoading) setIsLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    void loadAnalytics();
+    void loadAnalytics(true);
+    const intervalId = setInterval(() => {
+      void loadAnalytics(false);
+    }, 3000);
+    return () => clearInterval(intervalId);
   }, [loadAnalytics]);
 
   const metrics = [

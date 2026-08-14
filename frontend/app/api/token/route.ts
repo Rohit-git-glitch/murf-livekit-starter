@@ -43,13 +43,16 @@ export async function POST(req: Request) {
         { ignoreUnknownFields: true }
       );
     }
-      
+
     // Generate participant token
     const participantName = 'user';
-    const existingCallerId = req.cookies.get('anisha_caller_id')?.value;
-    const callerId = existingCallerId ?? crypto.randomUUID();
-    const participantIdentity = `voice_assistant_user_${callerId}`;
-    const roomName = `voice_assistant_room_${Math.floor(Math.random() * 10_000)}`;
+    const explicitCallerId = body?.caller_id ?? body?.user_id;
+    // Each web call session gets a unique isolated identity by default unless an explicit caller ID is provided
+    const sessionCallerId = explicitCallerId ?? crypto.randomUUID();
+    const participantIdentity = explicitCallerId
+      ? `voice_assistant_user_${explicitCallerId}`
+      : `voice_assistant_session_${sessionCallerId}`;
+    const roomName = `voice_assistant_room_${Math.floor(Math.random() * 10_000)}_${sessionCallerId.slice(0, 8)}`;
 
     const participantToken = await createParticipantToken(
       { identity: participantIdentity, name: participantName },
@@ -67,17 +70,7 @@ export async function POST(req: Request) {
     const headers = new Headers({
       'Cache-Control': 'no-store',
     });
-    const response = NextResponse.json(data, { headers });
-    if (!existingCallerId) {
-      response.cookies.set('anisha_caller_id', callerId, {
-        httpOnly: true,
-        sameSite: 'lax',
-        secure: process.env.NODE_ENV === 'production',
-        maxAge: 60 * 60 * 24 * 365,
-        path: '/',
-      });
-    }
-    return response;
+    return NextResponse.json(data, { headers });
   } catch (error) {
     if (error instanceof Error) {
       console.error(error);

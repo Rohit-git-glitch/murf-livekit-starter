@@ -212,12 +212,80 @@ class Assistant(Agent):
         """Find nearby PHCs, clinics, doctors, and hospitals from live OpenStreetMap data. Use only when the caller asks where to go or requests nearby care and has provided a PIN code, locality, town, or landmark. Results are map listings, not confirmed availability."""
         return await asyncio.to_thread(find_nearby_health_facilities, location, limit)
 
+    @function_tool
+    async def handoff_to_clinic_specialist(
+        self,
+        request_summary: str,
+        preferred_clinic: str | None = None,
+        preferred_date: str | None = None,
+        preferred_time: str | None = None,
+        location: str | None = None,
+    ) -> dict:
+        """Handoff the conversation to the Clinic and Appointment Specialist.
+
+        Use ONLY when the caller explicitly asks for clinic or appointment assistance,
+        such as booking an appointment, finding a clinic, visiting a doctor, or
+        scheduling a consultation.
+
+        Do NOT use for general health advice, symptom questions, symptom urgency assessment,
+        or caller memory lookup/save.
+        """
+        logger.info(
+            "Transferring caller %s to Clinic and Appointment Specialist (summary: %s)",
+            self.caller_user_id,
+            request_summary,
+        )
+        if not hasattr(self, "session") or not self.session:
+            return {"status": "error", "message": "No active session available for transfer."}
+
+        session_room = getattr(self.session, "room", None)
+        if session_room and getattr(session_room, "local_participant", None):
+            try:
+                asyncio.create_task(
+                    session_room.local_participant.set_attributes({
+                        "active_agent": "specialist",
+                        "agent_name": "Clinic Specialist",
+                        "agent_role": "Clinic & Appointment Specialist",
+                    })
+                )
+            except Exception:
+                logger.exception("Failed to set participant attributes for Specialist")
+
+        from clinic_specialist import ClinicSpecialistAgent
+
+        handoff_ctx = {
+            "request_summary": request_summary,
+            "preferred_clinic": preferred_clinic,
+            "preferred_date": preferred_date,
+            "preferred_time": preferred_time,
+            "location": location,
+        }
+
+        specialist = ClinicSpecialistAgent(
+            caller_user_id=self.caller_user_id,
+            caller_info=self.caller_info,
+            handoff_context=handoff_ctx,
+            call_outcome_tracker=self.call_outcome_tracker,
+        )
+
+        self.session.update_agent(specialist)
+
+        return {
+            "status": "transferred",
+            "specialist": "Clinic and Appointment Specialist",
+            "message": "Connected to Clinic and Appointment Specialist. I am ready to help you with your appointment.",
+        }
+
     def _is_current_caller(self, user_id: str) -> bool:
         return bool(self.caller_user_id and user_id == self.caller_user_id)
 
 
+
 def lookup_startup_memory(user_id: str) -> dict | None:
-    """Perform the same consented caller lookup before the agent's first reply."""
+    """Perform consented caller lookup before agent's first reply for identified callers."""
+    if not user_id or user_id.startswith("voice_assistant_session_"):
+        # Unauthenticated call session starts clean without guessing prior caller memory
+        return None
     try:
         record = memory_store.lookup(user_id)
     except sqlite3.Error:
@@ -231,9 +299,15 @@ server = AgentServer()
 
 
 def prewarm(proc: JobProcess):
-    # Load the VAD once per worker.  This is required to detect the end of a
+    # Load the VAD once per worker. This is required to detect the end of a
     # user's turn and start the LLM/TTS response.
     proc.userdata["vad"] = silero.VAD.load()
+    try:
+        memory_store.initialize()
+        escalation_store.initialize()
+        analytics_store.initialize()
+    except sqlite3.Error:
+        logger.exception("Caller data database initialization failed during prewarm")
 
 
 server.setup_fnc = prewarm
@@ -247,17 +321,19 @@ async def my_agent(ctx: JobContext):
         "room": ctx.room.name,
     }
 
-    try:
-        memory_store.initialize()
-        escalation_store.initialize()
-        analytics_store.initialize()
-    except sqlite3.Error:
-        logger.exception("Caller data database initialization failed")
-
     # Connect before reading participant identity; Room participants are not
     # available until the LiveKit context is connected.
     await ctx.connect()
     participant = await ctx.wait_for_participant()
+    if ctx.room and ctx.room.local_participant:
+        try:
+            await ctx.room.local_participant.set_attributes({
+                "active_agent": "anisha",
+                "agent_name": "Anisha",
+                "agent_role": "Health Access Assistant",
+            })
+        except Exception:
+            logger.exception("Failed to set initial participant attributes for Anisha")
     caller_user_id = participant.identity
     initial_caller_memory = lookup_startup_memory(caller_user_id)
 

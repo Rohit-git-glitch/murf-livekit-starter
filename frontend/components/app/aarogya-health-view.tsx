@@ -6,6 +6,7 @@ import {
   AlertCircle,
   BarChart3,
   Bot,
+  Calendar,
   CheckCircle2,
   HeartPulse,
   Loader2,
@@ -18,6 +19,7 @@ import {
   ShieldAlert,
   Sparkles,
   User,
+  UserCheck,
   Volume2,
   X,
 } from 'lucide-react';
@@ -35,15 +37,17 @@ import { CallAnalyticsDashboard } from '@/components/app/call-analytics-dashboar
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/shadcn/utils';
 
-/* ─── Simple inline transcript panel ─── */
+/* â”€â”€â”€ Simple inline transcript panel â”€â”€â”€ */
 function TranscriptPanel({
   messages,
   agentState,
+  activeAgentName = 'Anisha',
   onClose,
   onSendMessage,
 }: {
   messages: ReceivedMessage[];
   agentState: string;
+  activeAgentName?: string;
   onClose: () => void;
   onSendMessage?: (message: string) => Promise<void> | void;
 }) {
@@ -113,8 +117,16 @@ function TranscriptPanel({
           </div>
         )}
 
-        {messages.map((msg) => {
+        {messages.map((msg, index) => {
           const isUser = msg.from?.isLocal === true;
+          // Determine agent identity for each message bubble
+          const isSpecialistMsg =
+            !isUser &&
+            (msg.message?.includes('Specialist') ||
+              msg.message?.includes('Specialist') ||
+              (activeAgentName === 'Specialist' && index === messages.length - 1));
+          const senderLabel = isUser ? 'You' : isSpecialistMsg ? 'Specialist' : 'Anisha';
+
           return (
             <div
               key={msg.id}
@@ -126,10 +138,18 @@ function TranscriptPanel({
                   'flex h-7 w-7 shrink-0 items-center justify-center rounded-full',
                   isUser
                     ? 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
-                    : 'bg-teal-100 text-teal-700 dark:bg-teal-900/60 dark:text-teal-300'
+                    : isSpecialistMsg
+                      ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300'
+                      : 'bg-teal-100 text-teal-700 dark:bg-teal-900/60 dark:text-teal-300'
                 )}
               >
-                {isUser ? <User className="h-3.5 w-3.5" /> : <Bot className="h-3.5 w-3.5" />}
+                {isUser ? (
+                  <User className="h-3.5 w-3.5" />
+                ) : isSpecialistMsg ? (
+                  <UserCheck className="h-3.5 w-3.5" />
+                ) : (
+                  <Bot className="h-3.5 w-3.5" />
+                )}
               </div>
 
               {/* Bubble */}
@@ -138,11 +158,13 @@ function TranscriptPanel({
                   'max-w-[85%] rounded-2xl px-3.5 py-2 text-[13px] leading-relaxed',
                   isUser
                     ? 'rounded-tr-sm bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200'
-                    : 'rounded-tl-sm border border-teal-100 bg-teal-50 text-slate-800 dark:border-teal-900/40 dark:bg-teal-950/60 dark:text-slate-200'
+                    : isSpecialistMsg
+                      ? 'rounded-tl-sm border border-indigo-100 bg-indigo-50 text-slate-800 dark:border-indigo-900/40 dark:bg-indigo-950/60 dark:text-slate-200'
+                      : 'rounded-tl-sm border border-teal-100 bg-teal-50 text-slate-800 dark:border-teal-900/40 dark:bg-teal-950/60 dark:text-slate-200'
                 )}
               >
                 <p className="mb-0.5 text-[10px] font-semibold text-slate-400 dark:text-slate-500">
-                  {isUser ? 'You' : 'Anisha'}
+                  {senderLabel}
                 </p>
                 {msg.message}
               </div>
@@ -153,14 +175,47 @@ function TranscriptPanel({
         {/* Thinking indicator */}
         {agentState === 'thinking' && (
           <div className="flex gap-2.5 text-sm">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-teal-100 text-teal-700 dark:bg-teal-900/60 dark:text-teal-300">
-              <Bot className="h-3.5 w-3.5" />
+            <div
+              className={cn(
+                'flex h-7 w-7 shrink-0 items-center justify-center rounded-full',
+                activeAgentName === 'Specialist'
+                  ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300'
+                  : 'bg-teal-100 text-teal-700 dark:bg-teal-900/60 dark:text-teal-300'
+              )}
+            >
+              {activeAgentName === 'Specialist' ? (
+                <UserCheck className="h-3.5 w-3.5" />
+              ) : (
+                <Bot className="h-3.5 w-3.5" />
+              )}
             </div>
-            <div className="rounded-2xl rounded-tl-sm border border-teal-100 bg-teal-50 px-4 py-2.5 dark:border-teal-900/40 dark:bg-teal-950/60">
+            <div
+              className={cn(
+                'rounded-2xl rounded-tl-sm px-4 py-2.5',
+                activeAgentName === 'Specialist'
+                  ? 'border border-indigo-100 bg-indigo-50 dark:border-indigo-900/40 dark:bg-indigo-950/60'
+                  : 'border border-teal-100 bg-teal-50 dark:border-teal-900/40 dark:bg-teal-950/60'
+              )}
+            >
               <div className="flex items-center gap-1">
-                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-teal-500 [animation-delay:0ms]" />
-                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-teal-500 [animation-delay:150ms]" />
-                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-teal-500 [animation-delay:300ms]" />
+                <span
+                  className={cn(
+                    'h-1.5 w-1.5 animate-bounce rounded-full [animation-delay:0ms]',
+                    activeAgentName === 'Specialist' ? 'bg-indigo-500' : 'bg-teal-500'
+                  )}
+                />
+                <span
+                  className={cn(
+                    'h-1.5 w-1.5 animate-bounce rounded-full [animation-delay:150ms]',
+                    activeAgentName === 'Specialist' ? 'bg-indigo-500' : 'bg-teal-500'
+                  )}
+                />
+                <span
+                  className={cn(
+                    'h-1.5 w-1.5 animate-bounce rounded-full [animation-delay:300ms]',
+                    activeAgentName === 'Specialist' ? 'bg-indigo-500' : 'bg-teal-500'
+                  )}
+                />
               </div>
             </div>
           </div>
@@ -174,7 +229,7 @@ function TranscriptPanel({
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={onKeyDown}
             rows={1}
-            placeholder="Type a message to Anisha..."
+            placeholder={`Type a message to ${activeAgentName}...`}
             className="max-h-28 min-h-[40px] flex-1 resize-none bg-transparent px-2 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus:outline-none dark:text-slate-100 dark:placeholder:text-slate-500"
           />
           <Button
@@ -182,7 +237,12 @@ function TranscriptPanel({
             size="sm"
             onClick={handleSubmit}
             disabled={isSending || draft.trim().length === 0}
-            className="h-10 rounded-xl bg-teal-600 text-white hover:bg-teal-700 disabled:cursor-not-allowed disabled:opacity-60"
+            className={cn(
+              'h-10 rounded-xl text-white transition-colors disabled:cursor-not-allowed disabled:opacity-60',
+              activeAgentName === 'Specialist'
+                ? 'bg-indigo-600 hover:bg-indigo-700'
+                : 'bg-teal-600 hover:bg-teal-700'
+            )}
           >
             {isSending ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -196,7 +256,7 @@ function TranscriptPanel({
   );
 }
 
-/* ─── Main Aarogya Health View ─── */
+/* â”€â”€â”€ Main Aarogya Health View â”€â”€â”€ */
 export function AarogyaHealthView() {
   const session = useSessionContext();
   const agent = useAgent();
@@ -230,6 +290,63 @@ export function AarogyaHealthView() {
   const micTrack = session.local?.microphoneTrack;
   const micVolume = useTrackVolume(micTrack, { fftSize: 128, smoothingTimeConstant: 0.4 });
 
+  // Read LiveKit agent attributes for active agent state
+  const isSpecialistFromAttributes =
+    agent.attributes?.active_agent === 'specialist' ||
+    agent.attributes?.active_agent === 'Specialist' ||
+    agent.attributes?.agent_name === 'Clinic Specialist' ||
+    agent.attributes?.agent_name === 'Specialist';
+
+  const isSpecialistFromTranscript = React.useMemo(() => {
+    if (!messages || messages.length === 0) return false;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (m.from?.isLocal) continue;
+      const text = m.message || '';
+      if (
+        text.includes('Specialist') ||
+        text.includes('Specialist') ||
+        text.includes('Clinic Specialist') ||
+        text.toLowerCase().includes('clinic and appointment specialist')
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }, [messages]);
+
+  const isSpecialist = isSpecialistFromAttributes || isSpecialistFromTranscript;
+
+  const activeAgent = isSpecialist
+    ? {
+        id: 'specialist',
+        name: 'Clinic Specialist',
+        role: 'Clinic & Appointment Specialist',
+        badgeClass:
+          'bg-indigo-100 text-indigo-800 border border-indigo-200 dark:bg-indigo-950/80 dark:text-indigo-300 dark:border-indigo-800',
+        textColor: 'text-indigo-700 dark:text-indigo-400',
+        headerIconBg: 'bg-indigo-600 dark:bg-indigo-500 shadow-indigo-600/20',
+        avatarBg: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/60 dark:text-indigo-300',
+        speakingBorder:
+          'border-indigo-400/40 bg-gradient-to-br from-indigo-500/10 via-blue-500/10 to-cyan-500/20 shadow-indigo-500/10',
+        speakingBadge:
+          'border-indigo-200 bg-indigo-100 text-indigo-800 dark:border-indigo-800 dark:bg-indigo-950/80 dark:text-indigo-300',
+      }
+    : {
+        id: 'anisha',
+        name: 'Anisha',
+        role: 'Health Access Assistant',
+        badgeClass:
+          'bg-teal-100 text-teal-800 border border-teal-200 dark:bg-teal-900/60 dark:text-teal-300 dark:border-teal-800',
+        textColor: 'text-teal-700 dark:text-teal-400',
+        headerIconBg: 'bg-teal-600 dark:bg-teal-500 shadow-teal-600/20',
+        avatarBg: 'bg-teal-100 text-teal-700 dark:bg-teal-900/60 dark:text-teal-300',
+        speakingBorder:
+          'border-cyan-400/40 bg-gradient-to-br from-teal-500/10 via-cyan-500/10 to-emerald-500/20 shadow-cyan-500/10',
+        speakingBadge:
+          'border-cyan-200 bg-cyan-100 text-cyan-800 dark:border-cyan-800 dark:bg-cyan-950/80 dark:text-cyan-300',
+      };
+
   // Handle muted state toggle on local mic track
   const toggleMute = useCallback(() => {
     if (session.room?.localParticipant) {
@@ -246,21 +363,9 @@ export function AarogyaHealthView() {
     setIsConnecting(true);
 
     try {
-      // Pre-check microphone permission if possible
-      if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-          // Stop pre-check stream so LiveKit can request its own track cleanly
-          stream.getTracks().forEach((t) => t.stop());
-        } catch (err: any) {
-          console.error('Microphone access denied:', err);
-          setMicError(true);
-          setIsConnecting(false);
-          return;
-        }
-      }
-
       await session.start();
+      // Unlock browser audio context cleanly during user click interaction
+      void session.room?.startAudio();
       setIsConnecting(false);
     } catch (error: any) {
       console.error('Failed to start session:', error);
@@ -327,36 +432,54 @@ export function AarogyaHealthView() {
         <div className="absolute -bottom-32 left-1/4 h-96 w-96 rounded-full bg-cyan-400/10 blur-3xl dark:bg-cyan-500/10" />
       </div>
 
-      {/* ─── LEFT: Main Content Area ─── */}
+      {/* â”€â”€â”€ LEFT: Main Content Area â”€â”€â”€ */}
       <div
         className={cn(
           'relative z-10 flex flex-col items-center justify-between overflow-y-auto p-4 transition-all duration-300 sm:p-6 md:p-8',
           chatOpen ? 'w-full md:w-[60%] lg:w-[65%]' : 'w-full'
         )}
       >
-        {/* Top Bar: Brand Badge & Transcript Toggle */}
+        {/* Top Bar: Brand Badge & Active Agent Indicator */}
         <header className="flex w-full max-w-4xl items-center justify-between pt-2 pb-4">
           <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-teal-600 text-white shadow-md shadow-teal-600/20 dark:bg-teal-500">
-              <HeartPulse className="h-6 w-6" />
+            <div
+              className={cn(
+                'flex h-11 w-11 items-center justify-center rounded-2xl text-white shadow-md transition-all duration-300',
+                activeAgent.headerIconBg
+              )}
+            >
+              {isSpecialist ? <UserCheck className="h-6 w-6" /> : <HeartPulse className="h-6 w-6" />}
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-lg font-bold tracking-tight text-slate-900 dark:text-white">
                   Aarogya AI
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-full bg-teal-100 px-2.5 py-0.5 text-xs font-semibold text-teal-800 dark:bg-teal-900/60 dark:text-teal-300">
-                  <Sparkles className="h-3 w-3" /> Health Access
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold transition-all duration-300',
+                    activeAgent.badgeClass
+                  )}
+                >
+                  {isSpecialist ? <Calendar className="h-3 w-3" /> : <Sparkles className="h-3 w-3" />}
+                  {activeAgent.role}
                 </span>
               </div>
               <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                Assistant:{' '}
-                <strong className="font-semibold text-teal-700 dark:text-teal-400">Anisha</strong>
+                Active Agent:{' '}
+                <strong
+                  className={cn(
+                    'font-semibold transition-all duration-300',
+                    activeAgent.textColor
+                  )}
+                >
+                  {activeAgent.name}
+                </strong>
               </p>
             </div>
           </div>
 
-          {/* Transcript Toggle Button — visible during active session */}
+          {/* Transcript Toggle Button â€” visible during active session */}
           {!session.isConnected && (
             <Button
               variant="outline"
@@ -395,11 +518,24 @@ export function AarogyaHealthView() {
               <h1 className="mb-2 text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl dark:text-white">
                 Aarogya AI
               </h1>
-              <p className="mb-1 text-base font-semibold text-teal-700 sm:text-lg dark:text-teal-300">
-                Your Voice Assistant for Better Health Access
+              <p
+                className={cn(
+                  'mb-1 text-base font-semibold sm:text-lg transition-colors duration-300',
+                  activeAgent.textColor
+                )}
+              >
+                {activeAgent.role}
               </p>
               <p className="text-sm text-slate-600 dark:text-slate-300">
-                Talk to <strong>Anisha</strong> for basic health information and guidance.
+                {isSpecialist ? (
+                  <>
+                    Currently speaking with the <strong>Clinic Specialist</strong>..
+                  </>
+                ) : (
+                  <>
+                    Talk to <strong>Anisha</strong> for basic health information and guidance.
+                  </>
+                )}
               </p>
             </div>
 
@@ -488,23 +624,52 @@ export function AarogyaHealthView() {
                   className="flex w-full flex-col items-center text-center"
                 >
                   <div className="relative mb-6 flex h-32 w-32 items-center justify-center">
-                    <div className="absolute inset-0 animate-ping rounded-full bg-emerald-500/20" />
-                    <div className="absolute -inset-2 animate-pulse rounded-full bg-emerald-500/10" />
-                    <div className="relative flex h-24 w-24 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg shadow-emerald-600/30">
+                    <div
+                      className={cn(
+                        'absolute inset-0 animate-ping rounded-full',
+                        isSpecialist ? 'bg-indigo-500/20' : 'bg-emerald-500/20'
+                      )}
+                    />
+                    <div
+                      className={cn(
+                        'absolute -inset-2 animate-pulse rounded-full',
+                        isSpecialist ? 'bg-indigo-500/10' : 'bg-emerald-500/10'
+                      )}
+                    />
+                    <div
+                      className={cn(
+                        'relative flex h-24 w-24 items-center justify-center rounded-full text-white shadow-lg transition-colors duration-300',
+                        isSpecialist
+                          ? 'bg-indigo-600 shadow-indigo-600/30'
+                          : 'bg-emerald-600 shadow-emerald-600/30'
+                      )}
+                    >
                       <Mic className="h-10 w-10 animate-bounce" />
                     </div>
                   </div>
 
                   <div className="mb-6">
-                    <span className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300">
-                      <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+                    <span
+                      className={cn(
+                        'mb-2 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors duration-300',
+                        isSpecialist
+                          ? 'border-indigo-200 bg-indigo-100 text-indigo-800 dark:border-indigo-800 dark:bg-indigo-950/80 dark:text-indigo-300'
+                          : 'border-emerald-200 bg-emerald-100 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300'
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          'h-2 w-2 animate-pulse rounded-full',
+                          isSpecialist ? 'bg-indigo-500' : 'bg-emerald-500'
+                        )}
+                      />
                       Microphone Active
                     </span>
                     <h2 className="mb-1 text-xl font-bold text-slate-900 dark:text-white">
-                      Anisha is listening to you...
+                      {activeAgent.name} is listening to you...
                     </h2>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Speak naturally. Anisha is listening.
+                      Speak naturally. {activeAgent.name} is listening.
                     </p>
                   </div>
 
@@ -518,7 +683,12 @@ export function AarogyaHealthView() {
                       {isMuted ? (
                         <MicOff className="mr-2 h-4 w-4" />
                       ) : (
-                        <Mic className="mr-2 h-4 w-4 text-emerald-600" />
+                        <Mic
+                          className={cn(
+                            'mr-2 h-4 w-4',
+                            isSpecialist ? 'text-indigo-600' : 'text-emerald-600'
+                          )}
+                        />
                       )}
                       {isMuted ? 'Muted' : 'Mute Mic'}
                     </Button>
@@ -543,27 +713,67 @@ export function AarogyaHealthView() {
                   exit={{ opacity: 0, scale: 0.95 }}
                   className="flex w-full flex-col items-center text-center"
                 >
-                  <div className="relative mb-6 flex h-32 w-32 items-center justify-center rounded-full border-2 border-cyan-400/40 bg-gradient-to-br from-teal-500/10 via-cyan-500/10 to-emerald-500/20 shadow-lg shadow-cyan-500/10">
-                    <div className="absolute inset-0 animate-ping rounded-full border border-cyan-400/30" />
+                  <div
+                    className={cn(
+                      'relative mb-6 flex h-32 w-32 items-center justify-center rounded-full border-2 shadow-lg transition-colors duration-300',
+                      activeAgent.speakingBorder
+                    )}
+                  >
+                    <div
+                      className={cn(
+                        'absolute inset-0 animate-ping rounded-full border',
+                        isSpecialist ? 'border-indigo-400/30' : 'border-cyan-400/30'
+                      )}
+                    />
                     <div className="flex h-16 w-20 items-center justify-center gap-1.5">
-                      <span className="h-8 w-2 animate-[bounce_1s_infinite_100ms] rounded-full bg-cyan-500" />
-                      <span className="h-12 w-2 animate-[bounce_1s_infinite_300ms] rounded-full bg-teal-500" />
-                      <span className="h-16 w-2 animate-[bounce_1s_infinite_200ms] rounded-full bg-emerald-500" />
-                      <span className="h-10 w-2 animate-[bounce_1s_infinite_400ms] rounded-full bg-teal-500" />
-                      <span className="h-6 w-2 animate-[bounce_1s_infinite_150ms] rounded-full bg-cyan-500" />
+                      <span
+                        className={cn(
+                          'h-8 w-2 animate-[bounce_1s_infinite_100ms] rounded-full',
+                          isSpecialist ? 'bg-indigo-500' : 'bg-cyan-500'
+                        )}
+                      />
+                      <span
+                        className={cn(
+                          'h-12 w-2 animate-[bounce_1s_infinite_300ms] rounded-full',
+                          isSpecialist ? 'bg-blue-500' : 'bg-teal-500'
+                        )}
+                      />
+                      <span
+                        className={cn(
+                          'h-16 w-2 animate-[bounce_1s_infinite_200ms] rounded-full',
+                          isSpecialist ? 'bg-cyan-500' : 'bg-emerald-500'
+                        )}
+                      />
+                      <span
+                        className={cn(
+                          'h-10 w-2 animate-[bounce_1s_infinite_400ms] rounded-full',
+                          isSpecialist ? 'bg-blue-500' : 'bg-teal-500'
+                        )}
+                      />
+                      <span
+                        className={cn(
+                          'h-6 w-2 animate-[bounce_1s_infinite_150ms] rounded-full',
+                          isSpecialist ? 'bg-indigo-500' : 'bg-cyan-500'
+                        )}
+                      />
                     </div>
                   </div>
 
                   <div className="mb-6">
-                    <span className="mb-2 inline-flex items-center gap-1.5 rounded-full border border-cyan-200 bg-cyan-100 px-3 py-1 text-xs font-semibold text-cyan-800 dark:border-cyan-800 dark:bg-cyan-950/80 dark:text-cyan-300">
+                    <span
+                      className={cn(
+                        'mb-2 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors duration-300',
+                        activeAgent.speakingBadge
+                      )}
+                    >
                       <Volume2 className="h-3 w-3 animate-pulse" />
-                      Anisha Responding
+                      {activeAgent.name} Responding
                     </span>
                     <h2 className="mb-1 text-xl font-bold text-slate-900 dark:text-white">
-                      Anisha is speaking...
+                      {activeAgent.name} is speaking...
                     </h2>
                     <p className="text-xs text-slate-500 dark:text-slate-400">
-                      Listen to Anisha&apos;s guidance.
+                      Listen to {activeAgent.name}&apos;s guidance.
                     </p>
                   </div>
 
@@ -576,7 +786,12 @@ export function AarogyaHealthView() {
                       {isMuted ? (
                         <MicOff className="mr-2 h-4 w-4" />
                       ) : (
-                        <Mic className="mr-2 h-4 w-4 text-teal-600" />
+                        <Mic
+                          className={cn(
+                            'mr-2 h-4 w-4',
+                            isSpecialist ? 'text-indigo-600' : 'text-teal-600'
+                          )}
+                        />
                       )}
                       {isMuted ? 'Muted' : 'Mute Mic'}
                     </Button>
@@ -678,7 +893,7 @@ export function AarogyaHealthView() {
         </footer>
       </div>
 
-      {/* ─── RIGHT: Transcript Side Panel ─── */}
+      {/* â”€â”€â”€ RIGHT: Transcript Side Panel â”€â”€â”€ */}
       <AnimatePresence>
         {chatOpen && session.isConnected && (
           <motion.aside
@@ -693,6 +908,7 @@ export function AarogyaHealthView() {
               <TranscriptPanel
                 messages={messages}
                 agentState={agent.state}
+                activeAgentName={activeAgent.name}
                 onClose={() => setChatOpen(false)}
                 onSendMessage={handleSendTextMessage}
               />
@@ -727,6 +943,7 @@ export function AarogyaHealthView() {
             <TranscriptPanel
               messages={messages}
               agentState={agent.state}
+              activeAgentName={activeAgent.name}
               onClose={() => setChatOpen(false)}
               onSendMessage={handleSendTextMessage}
             />
@@ -736,3 +953,4 @@ export function AarogyaHealthView() {
     </div>
   );
 }
+
